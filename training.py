@@ -46,10 +46,6 @@ class TrainingCoursePendingReason(ModelView, ModelSQL):
         ('uniq_code', 'unique(code)', "Must be unique"),
     ]
 
-def training_course_pending_reason_compute(obj, cr, uid, context=None):
-    proxy = obj.pool.get('training.course.pending.reason')
-    return [(reason.code, reason.name) for reason in proxy.browse(cr, uid, proxy.search(cr, uid, []))] or []
-
 class TrainingCoursePending(ModelView, ModelSQL):
     'Training Course Pending'
     __name__ = 'training.course.pending'
@@ -145,58 +141,6 @@ class TrainingCoursePending(ModelView, ModelSQL):
         'todo' : lambda *a: 0,
         'followup_by' : lambda obj, cr, uid, context: uid,
     }
-
-class training_course_pending_wizard(osv.osv_memory):
-    _name = 'training.course.pending.wizard'
-
-    _columns = {
-        'course_id' : fields.many2one('training.course', 'Course'),
-        'type' : fields.selection(training_course_pending_reason_compute,
-                                    'Type',
-                                    size=32,
-                                    required=True),
-        'date' : fields.date('Planned Date'),
-        'reason' : fields.text('Reason'),
-        'job_id' : fields.many2one('res.partner.job', 'Contact', required=True),
-        'state' : fields.selection([('first_screen', 'First Screen'),
-                                    ('second_screen', 'Second Screen')],
-                                   'State')
-    }
-
-    _defaults = {
-        'type' : lambda *a: 'update_support',
-        'state' : lambda *a: 'first_screen',
-        'course_id' : lambda obj, cr, uid, context: context.get('active_id', 0)
-    }
-
-    def action_cancel(self, cr, uid, ids, context=None):
-        return {'type' : 'ir.actions.act_window_close'}
-
-    def action_apply(self, cr, uid, ids, context=None):
-        course_id = context and context.get('active_id', False) or False
-
-        if not course_id:
-            return False
-
-        this = self.browse(cr, uid, ids)[0]
-
-        workflow = netsvc.LocalService('workflow')
-        workflow.trg_validate(uid, 'training.course', course_id, 'signal_pending', cr)
-
-        values = {
-            'course_id' : course_id,
-            'type' : this.type,
-            'date' : this.date,
-            'reason' : this.reason,
-            'job_id' : this.job_id and this.job_id.id,
-        }
-
-        self.pool.get('training.course.pending').create(cr, uid, values, context=context)
-
-        return {'res_id' : course_id}
-
-training_course_pending_wizard()
-
 
 class TrainingContantCourse(ModelView, ModelSQL):
     _name = 'training.contact.course'
